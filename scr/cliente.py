@@ -77,5 +77,22 @@ class Cliente:
                 cur.close()
             conn.close()
 
+    def eliminar(self):
+        conn = get_conn()
+        cur = None
+        try:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM clientes WHERE id = %s", (self.id,))
+            conn.commit()
+            return True
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            raise e
+        finally:
+            if cur:
+                cur.close()
+            conn.close()
+
     def __str__(self):
         return f"{self.nombre} | RFC: {self.rfc}"

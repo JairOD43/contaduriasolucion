@@ -1,3 +1,4 @@
+# execute.py
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from tkinter import font as tkfont
@@ -160,11 +161,22 @@ def actualizar_cliente():
         output.insert(tk.END, f"Error al actualizar cliente: {e}\n", "danger")
 
 def eliminar_cliente():
+    global cliente_seleccionado
     if not cliente_seleccionado:
         messagebox.showerror("Error", "Selecciona un cliente primero")
         return
-    if messagebox.askyesno("Confirmar", f"Eliminar {cliente_seleccionado.nombre}?"):
-        output.insert(tk.END, f"Cliente eliminado: {cliente_seleccionado.nombre}\n", "danger")
+    if messagebox.askyesno("Confirmar", f"Eliminar {cliente_seleccionado.nombre}? Esta acción eliminará también las transacciones relacionadas."):
+        try:
+            nombre_eliminado = cliente_seleccionado.nombre
+            cliente_seleccionado.eliminar()
+            cliente_seleccionado = None
+            lbl_cliente.config(text="Ningún cliente seleccionado")
+            output.insert(tk.END, f"Cliente eliminado: {nombre_eliminado}\n", "danger")
+            output.insert(tk.END, "Transacciones asociadas eliminadas por cascada.\n", "warning")
+            messagebox.showinfo("Éxito", f"Cliente {nombre_eliminado} eliminado correctamente.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al eliminar: {e}")
+            output.insert(tk.END, f"Error al eliminar cliente: {e}\n", "danger")
 
 def registrar_transaccion():
     if not cliente_seleccionado:
