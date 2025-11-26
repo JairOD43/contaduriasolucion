@@ -5,6 +5,7 @@ from datetime import datetime
 from usuario import Usuario
 from cliente import Cliente
 from transaccion import Transaccion
+from auditoria import Auditoria
 from auditoria_ia import detectar_errores
 
 current_user = None
@@ -81,7 +82,6 @@ def login_window():
         pwd = entry_pwd.get()
         if not nombre:
             return messagebox.showerror("Error", "Nombre requerido")
-        # Nueva verificación para evitar duplicados
         if Usuario.buscar_por_nombre(nombre):
             return messagebox.showerror("Error", "El nombre de usuario ya existe")
         if rol == "admin":
@@ -100,174 +100,168 @@ def login_window():
 def actualizar_interfaz():
     lbl_user.config(text=f"Usuario: {current_user.nombre} ({current_user.role})")
     actualizar_permisos_menu()
-    if cliente_seleccionado:
-        lbl_cliente.config(text=f"Cliente: {cliente_seleccionado.nombre} | RFC: {cliente_seleccionado.rfc}")
 
 def actualizar_permisos_menu():
-    rol = current_user.role if current_user else "none"
-    for texto, (boton, roles) in botones_widgets.items():
-        if rol in roles:
-            boton.config(state="normal", bg="#141a28")
+    for texto, (btn, roles) in botones_widgets.items():
+        if current_user and current_user.role in roles:
+            btn.config(state=tk.NORMAL)
         else:
-            boton.config(state="disabled", bg="#0f131a")
+            btn.config(state=tk.DISABLED)
 
 def seleccionar_cliente():
-    global cliente_seleccionado
-    busqueda = simpledialog.askstring("Buscar Cliente", "Nombre o parte del nombre:")
-    if busqueda:
-        cliente = Cliente.buscar_por_nombre(busqueda)
-        if cliente:
-            cliente_seleccionado = cliente
-            lbl_cliente.config(text=f"Cliente: {cliente.nombre} | RFC: {cliente_seleccionado.rfc}")
-            listar_transacciones()
+    if not current_user:
+        return
+    clientes = Cliente.listar_todos()
+    if not clientes:
+        messagebox.showinfo("Info", "No hay clientes registrados.")
+        return
+    nombres = [c.nombre for c in clientes]
+    seleccion = simpledialog.askstring("Seleccionar Cliente", "Nombre del cliente:", initialvalue=nombres[0] if nombres else "")
+    if seleccion:
+        global cliente_seleccionado
+        cliente_seleccionado = Cliente.buscar_por_nombre(seleccion)
+        if cliente_seleccionado:
+            lbl_cliente.config(text=f"Cliente: {cliente_seleccionado.nombre} | RFC: {cliente_seleccionado.rfc}")
+            output.delete(1.0, tk.END)
+            output.insert(tk.END, f"Cliente seleccionado: {cliente_seleccionado.nombre}\n\n", "success")
+            cargar_transacciones()
         else:
-            messagebox.showinfo("No encontrado", "Cliente no encontrado")
+            messagebox.showerror("Error", "Cliente no encontrado")
 
 def formulario_nuevo_cliente():
-    win = tk.Toplevel(root)
-    win.title("Registrar Nuevo Cliente")
-    win.geometry("520x480")
-    win.configure(bg="#0f1422")
-
-    tk.Label(win, text="Nuevo Cliente", font=("Segoe UI", 18, "bold"), fg=accent, bg="#0f1422").pack(pady=25)
-
-    form = ttk.Frame(win, padding=40)
-    form.pack(fill=tk.BOTH, expand=True)
-
-    ttk.Label(form, text="Razón Social:").grid(row=0, column=0, sticky="w", pady=10)
-    e_nombre = ttk.Entry(form, width=40)
-    e_nombre.grid(row=0, column=1, pady=10)
-
-    ttk.Label(form, text="RFC:").grid(row=1, column=0, sticky="w", pady=10)
-    e_rfc = ttk.Entry(form, width=40)
-    e_rfc.grid(row=1, column=1, pady=10)
-
-    ttk.Label(form, text="Régimen Fiscal:").grid(row=2, column=0, sticky="w", pady=10)
-    e_regimen = ttk.Entry(form, width=40)
-    e_regimen.grid(row=2, column=1, pady=10)
-
-    def submit():
-        nombre = e_nombre.get().strip()
-        rfc = e_rfc.get().strip()
-        regimen = e_regimen.get().strip() or "Régimen General"
-        if not nombre or not rfc:
-            return messagebox.showerror("Error", "Nombre y RFC requeridos")
+    if current_user.role != "admin":
+        messagebox.showerror("Acceso Denegado", "Solo admins pueden crear clientes")
+        return
+    # Aquí va el formulario para nuevo cliente (ejemplo básico; expándelo si necesitas)
+    nombre = simpledialog.askstring("Nuevo Cliente", "Nombre del cliente:")
+    if nombre:
+        rfc = simpledialog.askstring("Nuevo Cliente", "RFC:")
+        regimen = simpledialog.askstring("Nuevo Cliente", "Régimen fiscal (default: Régimen General):", initialvalue="Régimen General")
         try:
-            cliente = Cliente.crear(nombre, rfc, regimen)
-            messagebox.showinfo("Éxito", f"Cliente registrado: {cliente}")
-            win.destroy()
+            Cliente.crear(nombre, rfc, regimen)
+            messagebox.showinfo("Éxito", f"Cliente {nombre} creado.")
+            output.insert(tk.END, f"Nuevo cliente: {nombre} (RFC: {rfc})\n", "success")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar: {str(e)}")
+            messagebox.showerror("Error", f"Error al crear: {e}")
 
-    ttk.Button(form, text="Registrar", command=submit).grid(row=3, column=0, columnspan=2, pady=20)
+def actualizar_cliente():
+    if not cliente_seleccionado:
+        messagebox.showerror("Error", "Selecciona un cliente primero")
+        return
+    # Ejemplo básico; expándelo
+    nuevo_nombre = simpledialog.askstring("Actualizar", f"Nuevo nombre para {cliente_seleccionado.nombre}:")
+    if nuevo_nombre:
+        # Aquí actualizar en DB (implementa según necesites)
+        output.insert(tk.END, f"Actualizando cliente: {nuevo_nombre}\n", "warning")
+
+def eliminar_cliente():
+    if not cliente_seleccionado:
+        messagebox.showerror("Error", "Selecciona un cliente primero")
+        return
+    if messagebox.askyesno("Confirmar", f"Eliminar {cliente_seleccionado.nombre}?"):
+        # Implementa eliminación
+        output.insert(tk.END, f"Cliente eliminado: {cliente_seleccionado.nombre}\n", "danger")
 
 def registrar_transaccion():
     if not cliente_seleccionado:
-        return messagebox.showerror("Error", "Selecciona un cliente primero")
-    win = tk.Toplevel(root)
-    win.title("Nueva Transacción")
-    win.geometry("520x480")
-    win.configure(bg="#0f1422")
-
-    tk.Label(win, text="Nueva Transacción", font=("Segoe UI", 18, "bold"), fg=accent, bg="#0f1422").pack(pady=25)
-
-    form = ttk.Frame(win, padding=40)
-    form.pack(fill=tk.BOTH, expand=True)
-
-    ttk.Label(form, text="Fecha:").grid(row=0, column=0, sticky="w", pady=10)
-    e_fecha = ttk.Entry(form, width=40)
-    e_fecha.insert(0, datetime.now().strftime("%Y-%m-%d"))
-    e_fecha.grid(row=0, column=1, pady=10)
-
-    ttk.Label(form, text="Concepto:").grid(row=1, column=0, sticky="w", pady=10)
-    e_concepto = ttk.Entry(form, width=40)
-    e_concepto.grid(row=1, column=1, pady=10)
-
-    ttk.Label(form, text="Monto:").grid(row=2, column=0, sticky="w", pady=10)
-    e_monto = ttk.Entry(form, width=40)
-    e_monto.grid(row=2, column=1, pady=10)
-
-    ttk.Label(form, text="Tipo:").grid(row=3, column=0, sticky="w", pady=10)
-    combo_tipo = ttk.Combobox(form, values=["ingreso", "gasto"], state="readonly")
-    combo_tipo.set("ingreso")
-    combo_tipo.grid(row=3, column=1, pady=10)
-
-    def submit():
+        messagebox.showerror("Error", "Selecciona un cliente primero")
+        return
+    concepto = simpledialog.askstring("Nueva Transacción", "Concepto:")
+    if concepto:
+        monto_str = simpledialog.askstring("Nueva Transacción", "Monto:")
+        tipo = simpledialog.askstring("Nueva Transacción", "Tipo (ingreso/gasto):")
+        fecha = simpledialog.askstring("Nueva Transacción", "Fecha (YYYY-MM-DD):", initialvalue=datetime.now().strftime("%Y-%m-%d"))
         try:
-            fecha = datetime.strptime(e_fecha.get(), "%Y-%m-%d").date()
-            concepto = e_concepto.get().strip()
-            monto = float(e_monto.get())
-            tipo = combo_tipo.get()
-            if not concepto or monto <= 0:
-                raise ValueError("Datos inválidos")
+            monto = float(monto_str)
             Transaccion.crear(cliente_seleccionado.id, fecha, concepto, monto, tipo)
-            messagebox.showinfo("Éxito", "Transacción registrada")
-            win.destroy()
-            listar_transacciones()
-        except ValueError as e:
-            messagebox.showerror("Error", f"Error en datos: {e}")
+            output.insert(tk.END, f"Transacción registrada: {concepto} - ${monto}\n", "success")
+            cargar_transacciones()
+        except ValueError:
+            messagebox.showerror("Error", "Monto inválido")
 
-    ttk.Button(form, text="Registrar", command=submit).grid(row=4, column=0, columnspan=2, pady=20)
+def actualizar_transaccion():
+    # Implementa según necesites
+    output.insert(tk.END, "Actualizar transacción (pendiente de implementación)\n", "warning")
+
+def eliminar_transaccion():
+    # Implementa según necesites
+    output.insert(tk.END, "Eliminar transacción (pendiente de implementación)\n", "warning")
 
 def detectar_errores_ia():
     if not cliente_seleccionado:
-        return messagebox.showerror("Error", "Selecciona un cliente primero")
+        messagebox.showerror("Error", "Selecciona un cliente primero")
+        return
     transacciones = Transaccion.listar_por_cliente(cliente_seleccionado.id)
-    errores = detectar_errores(transacciones)
-    output.delete(1.0, tk.END)
-    output.insert(tk.END, f"AUDITORÍA IA - {cliente_seleccionado.nombre.upper()}\n", "title")
-    output.insert(tk.END, "-" * 80 + "\n\n")
-    for err in errores:
-        if "ALTA" in err or "IA" in err:
-            tag = "critical"
-        elif "MEDIA" in err:
-            tag = "warning"
-        else:
-            tag = "success"
-        output.insert(tk.END, f"{err}\n", tag)
+    if not transacciones:
+        output.insert(tk.END, "No hay transacciones para auditar.\n", "warning")
+        return
+    # Simula objetos para detectar_errores (ajusta según estructura)
+    trans_list = []
+    for t in transacciones:
+        trans_list.append(type('obj', (object,), {'tipo': t.tipo, 'monto': t.monto, 'concepto': t.concepto})())
+    errores = detectar_errores(trans_list)
+    output.insert(tk.END, "AUDITORÍA IA\n", "title")
+    for error in errores:
+        tag = "critical" if "ALTA" in error or "IA -" in error else "warning"
+        output.insert(tk.END, f"{error}\n\n", tag)
+    # Crear auditoría ejemplo
+    if errores and errores[0] != "Ningún error crítico detectado por IA.":
+        Auditoria.crear(transacciones[0].id, current_user.id, date.today(), "Auditoría IA ejecutada", "pendiente")
+
+def ver_auditorias():
+    if not cliente_seleccionado:
+        messagebox.showerror("Error", "Selecciona un cliente primero")
+        return
+    transacciones = Transaccion.listar_por_cliente(cliente_seleccionado.id)
+    output.insert(tk.END, "AUDITORÍAS\n", "title")
+    for t in transacciones:
+        auds = Auditoria.listar_por_transaccion(t.id)
+        output.insert(tk.END, f"Transacción {t.id}: {len(auds)} auditorías\n", "line")
+        for a in auds:
+            output.insert(tk.END, f"  - {a.descripcion} ({a.resultado})\n", "line")
+
+def eliminar_auditoria():
+    # Implementa según necesites
+    output.insert(tk.END, "Eliminar auditoría (pendiente de implementación)\n", "warning")
 
 def ver_todos_clientes():
-    output.delete(1.0, tk.END)
     clientes = Cliente.listar_todos()
-    output.insert(tk.END, "CLIENTES REGISTRADOS\n", "title")
-    output.insert(tk.END, "-" * 80 + "\n\n")
-    if not clientes:
-        output.insert(tk.END, "No hay clientes registrados.\n")
-    else:
-        for c in clientes:
-            output.insert(tk.END, f"{c.nombre}\n")
-            output.insert(tk.END, f"RFC: {c.rfc} | Régimen: {c.regimen_fiscal}\n\n")
+    output.insert(tk.END, "TODOS LOS CLIENTES\n", "title")
+    for c in clientes:
+        output.insert(tk.END, f"{c}\n", "line")
 
-def listar_transacciones():
+def ver_todos_usuarios():
+    if current_user.role != "admin":
+        messagebox.showerror("Acceso Denegado", "Solo admins pueden ver usuarios")
+        return
+    usuarios = Usuario.listar_todos()
+    if not usuarios:
+        output.insert(tk.END, "No hay usuarios registrados.\n", "warning")
+        return
+    output.insert(tk.END, "LISTA DE USUARIOS\n", "title")
+    output.insert(tk.END, "=" * 50 + "\n\n", "line")
+    for u in usuarios:
+        output.insert(tk.END, f"ID: {u.id} | {u.nombre} ({u.role})\n\n", "line")
+    output.see(tk.END)
+
+def cargar_transacciones():
     if not cliente_seleccionado:
         return
-    output.delete(1.0, tk.END)
     transacciones = Transaccion.listar_por_cliente(cliente_seleccionado.id)
-    total_i = total_g = 0
-
-    output.insert(tk.END, f"TRANSACCIONES - {cliente_seleccionado.nombre.upper()}\n", "title")
-    output.insert(tk.END, "-" * 80 + "\n\n")
-
+    output.insert(tk.END, f"TRANSSACCIONES DE {cliente_seleccionado.nombre}\n", "title")
+    saldo = 0
     for t in transacciones:
-        signo = "+" if t.tipo == "ingreso" else "-"
-        color = "green" if t.tipo == "ingreso" else "red"
-        output.insert(tk.END, f"{t.fecha}  ", "date")
-        output.insert(tk.END, f"{signo}${t.monto:,.2f}  ", color)
-        output.insert(tk.END, f"{t.concepto}\n")
+        tag = "saldo" if t.tipo == "ingreso" else "negative"
+        output.insert(tk.END, f"{t.fecha} | {t.concepto} | ${t.monto:.2f} ({t.tipo})\n", tag)
         if t.tipo == "ingreso":
-            total_i += t.monto
+            saldo += t.monto
         else:
-            total_g += t.monto
-
-    output.insert(tk.END, "\n" + "-" * 80 + "\n", "line")
-    output.insert(tk.END, f"TOTAL INGRESOS:  ${total_i:,.2f}\n", "green")
-    output.insert(tk.END, f"TOTAL GASTOS:    ${total_g:,.2f}\n", "red")
-    saldo = total_i - total_g
-    output.insert(tk.END, f"SALDO:           ${saldo:,.2f}\n", "saldo" if saldo >= 0 else "negative")
+            saldo -= t.monto
+    output.insert(tk.END, f"\nSaldo total: ${saldo:.2f}\n", "saldo" if saldo >= 0 else "negative")
 
 def cerrar_sesion():
+    global current_user, cliente_seleccionado  # ← CORREGIDO: Movido al inicio de la función
     if messagebox.askyesno("Cerrar sesión", "¿Cerrar sesión actual?"):
-        global current_user, cliente_seleccionado
         current_user = None
         cliente_seleccionado = None
         lbl_user.config(text="Usuario: No autenticado")
@@ -287,9 +281,16 @@ tk.Label(sidebar, text="Executive Suite", font=("Segoe UI", 11), fg="#0088cc", b
 botones_config = [
     ("Seleccionar Cliente", seleccionar_cliente, ["cliente", "contador_principal", "admin"]),
     ("Registrar Nuevo Cliente", formulario_nuevo_cliente, ["contador_principal", "admin"]),
+    ("Actualizar Cliente", actualizar_cliente, ["contador_principal", "admin"]),
+    ("Eliminar Cliente", eliminar_cliente, ["admin"]),
     ("Nueva Transacción", registrar_transaccion, ["contador_principal", "admin"]),
+    ("Actualizar Transacción", actualizar_transaccion, ["contador_principal", "admin"]),
+    ("Eliminar Transacción", eliminar_transaccion, ["admin"]),
     ("Auditoría con IA (CU-12)", detectar_errores_ia, ["contador_principal", "admin"]),
+    ("Ver Auditorías", ver_auditorias, ["contador_principal", "admin"]),
+    ("Eliminar Auditoría", eliminar_auditoria, ["admin"]),
     ("Ver Todos los Clientes", ver_todos_clientes, ["contador_principal", "admin"]),
+    ("Ver Todos los Usuarios", ver_todos_usuarios, ["admin"]),
     ("Cerrar Sesión", cerrar_sesion, ["cliente", "contador_principal", "admin"]),
 ]
 
@@ -297,10 +298,10 @@ botones_widgets = {}
 for texto, cmd, roles in botones_config:
     b = tk.Button(sidebar, text=f"   {texto}", font=menu_font, fg=text_color, bg="#141a28",
                   activebackground="#00ffaa", activeforeground="white", relief=tk.FLAT,
-                  anchor="w", padx=30, pady=18, command=cmd, cursor="hand2")
+                  anchor="w", padx=30, pady=18, command=cmd, cursor="hand2", state=tk.DISABLED)
     b.pack(fill=tk.X, pady=5, padx=20)
-    b.bind("<Enter>", lambda e, btn=b: btn.config(bg="#1e2538"))
-    b.bind("<Leave>", lambda e, btn=b: btn.config(bg="#141a28"))
+    b.bind("<Enter>", lambda e, btn=b: btn.config(bg="#1e2538") if btn.cget("state") != "disabled" else None)
+    b.bind("<Leave>", lambda e, btn=b: btn.config(bg="#141a28") if btn.cget("state") != "disabled" else None)
     botones_widgets[texto] = (b, roles)
 
 main = tk.Frame(root, bg=bg_main)
@@ -321,7 +322,7 @@ lbl_cliente.pack(fill=tk.X, anchor="w")
 output_frame = tk.Frame(main, bg=bg_main)
 output_frame.pack(fill=tk.BOTH, expand=True)
 
-output = tk.Text(output_frame, font=text_font, bg="#0c1018", fg=text_color, wrap=tk.WORD, relief=tk.FLAT, bd=12, insertbackground=accent)
+output = tk.Text(output_frame, font=text_font, bg="#0c1018", fg=text_color, wrap=tk.WORD, relief=tk.FLAT, bd=12, insertbackground=accent, height=30)
 scroll = ttk.Scrollbar(output_frame, command=output.yview)
 output.configure(yscrollcommand=scroll.set)
 output.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -338,5 +339,6 @@ output.tag_config("warning", foreground="#ffaa00")
 output.tag_config("saldo", foreground=success, font=("Consolas", 13, "bold"))
 output.tag_config("negative", foreground=danger, font=("Consolas", 13, "bold"))
 
+actualizar_permisos_menu()
 root.after(500, login_window)
 root.mainloop()

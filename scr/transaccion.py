@@ -13,6 +13,7 @@ class Transaccion:
     @classmethod
     def crear(cls, cliente_id, fecha, concepto, monto, tipo_transaccion):
         conn = get_conn()
+        cur = None
         try:
             cur = conn.cursor()
             cur.execute("""
@@ -22,16 +23,19 @@ class Transaccion:
             conn.commit()
             return cls(cur.lastrowid, cliente_id, fecha, concepto, monto, tipo_transaccion)
         finally:
-            cur.close()
-            conn.return_to_pool()
+            if cur:
+                cur.close()
+            conn.close()
 
     @classmethod
     def listar_por_cliente(cls, cliente_id):
         conn = get_conn()
+        cur = None
         try:
             cur = conn.cursor()
             cur.execute("SELECT id, cliente_id, fecha, concepto, monto, tipo_transaccion FROM transacciones WHERE cliente_id = %s ORDER BY fecha DESC", (cliente_id,))
             return [cls(*row) for row in cur.fetchall()]
         finally:
-            cur.close()
-            conn.return_to_pool()
+            if cur:
+                cur.close()
+            conn.close()

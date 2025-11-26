@@ -1,15 +1,12 @@
-# setup_db.py  ←  REEMPLAZA COMPLETAMENTE TU ARCHIVO CON ESTE
 import mysql.connector
 from mysql.connector import Error
 
-# Tus datos reales de MySQL (cámbialos si es necesario)
 HOST = "localhost"
 USER = "root"
-PASSWORD = "root1"        # ← Pon aquí tu contraseña real de MySQL (si no tiene, déjalo como "")
+PASSWORD = "root1"
 PORT = 3306
 
 try:
-    # 1. Conexión SIN especificar base de datos
     conn = mysql.connector.connect(
         host=HOST,
         user=USER,
@@ -20,12 +17,10 @@ try:
 
     print("Conexión exitosa a MySQL")
 
-    # 2. Crear la base de datos
     cur.execute("CREATE DATABASE IF NOT EXISTS contabilidad_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
     cur.execute("USE contabilidad_db")
     print("Base de datos contabilidad_db creada o ya existe")
 
-    # 3. Crear tablas
     cur.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -59,7 +54,20 @@ try:
     ) ENGINE=InnoDB
     """)
 
-    # 4. Usuario admin por defecto
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS auditorias (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        transaccion_id INT NOT NULL,
+        usuario_id INT NOT NULL,
+        fecha_auditoria DATE NOT NULL,
+        descripcion TEXT,
+        resultado ENUM('aprobada', 'rechazada', 'pendiente') DEFAULT 'pendiente',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (transaccion_id) REFERENCES transacciones(id) ON DELETE CASCADE,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB
+    """)
+
     from hashlib import sha256
     admin_pass = sha256("admin123".encode()).hexdigest()
     cur.execute("""
@@ -67,7 +75,6 @@ try:
     VALUES ('admin', 'admin', %s)
     """, (admin_pass,))
 
-    # 5. Cliente y transacciones de prueba (para que veas el CU-12 funcionando)
     cur.execute("INSERT IGNORE INTO clientes (nombre, rfc) VALUES ('ACME SA de CV', 'ACM201122ABC')")
     cur.execute("SELECT id FROM clientes WHERE nombre = 'ACME SA de CV'")
     cliente_id = cur.fetchone()[0]
@@ -83,8 +90,15 @@ try:
         VALUES (%s, %s, %s, %s, %s)
     """, transacciones)
 
+    admin_id = 1
+    cur.execute("""
+        INSERT IGNORE INTO auditorias (transaccion_id, usuario_id, fecha_auditoria, descripcion, resultado) 
+        VALUES (1, %s, '2025-11-25', 'Anomalía detectada por IA: Ingreso > $500k sin CFDI', 'pendiente'),
+               (4, %s, '2025-11-25', 'IA - Patrón anómalo: secuencia sospechosa de movimientos', 'rechazada')
+    """, (admin_id, admin_id))
+
     conn.commit()
-    print("¡TODO LISTO!")
+    print("¡TODO LISTO! Incluyendo tabla auditorias con datos de prueba.")
     print("Usuario: admin")
     print("Contraseña: admin123")
     print("Ahora ejecuta: python execute.py")
