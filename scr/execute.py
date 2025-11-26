@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from tkinter import font as tkfont
-from datetime import datetime
+from datetime import datetime, date  # ← CORREGIDO: Añadido 'date'
 from usuario import Usuario
 from cliente import Cliente
 from transaccion import Transaccion
