@@ -1,4 +1,3 @@
-# usuario.py  ← VERSIÓN FINAL CORREGIDA (FUNCIONA AL 100%)
 from db_connection import get_conn
 import hashlib
 
@@ -15,7 +14,7 @@ class Usuario:
 
     @classmethod
     def crear(cls, nombre, role="cliente", password=None):
-        conn = get_conn()  # ← Viene del pool
+        conn = get_conn()  
         cur = None
         try:
             cur = conn.cursor()
@@ -29,8 +28,8 @@ class Usuario:
         finally:
             if cur:
                 cur.close()
-            # ¡IMPORTANTE! Con pool, usamos close() para devolverla al pool
-            conn.close()   # ← Esto SÍ devuelve la conexión al pool
+            
+            conn.close()   
 
     @classmethod
     def autenticar(cls, nombre, password):
@@ -46,7 +45,7 @@ class Usuario:
         finally:
             if cur:
                 cur.close()
-            conn.close()   # ← Correcto: devuelve al pool
+            conn.close()  
 
     @classmethod
     def buscar_por_nombre(cls, nombre):
@@ -62,7 +61,7 @@ class Usuario:
         finally:
             if cur:
                 cur.close()
-            conn.close()   # ← Correcto
+            conn.close()  
 
     @classmethod
     def listar_todos(cls):

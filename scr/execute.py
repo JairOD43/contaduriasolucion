@@ -1,4 +1,3 @@
-# execute.py
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from tkinter import font as tkfont
@@ -196,7 +195,32 @@ def registrar_transaccion():
             messagebox.showerror("Error", "Monto inválido")
 
 def eliminar_transaccion():
-    output.insert(tk.END, "Eliminar transacción (pendiente de implementación)\n", "warning")
+    global cliente_seleccionado
+    if not cliente_seleccionado:
+        messagebox.showerror("Error", "Selecciona un cliente primero")
+        return
+    transaccion_id_str = simpledialog.askstring("Eliminar Transacción", "Ingresa el ID de la transacción a eliminar:")
+    if transaccion_id_str:
+        try:
+            transaccion_id = int(transaccion_id_str)
+            transaccion = Transaccion.buscar_por_id(transaccion_id)
+            if not transaccion:
+                messagebox.showerror("Error", "Transacción no encontrada")
+                return
+            if transaccion.cliente_id != cliente_seleccionado.id:
+                messagebox.showerror("Error", "Esta transacción no pertenece al cliente seleccionado")
+                return
+            if messagebox.askyesno("Confirmar", f"Eliminar transacción ID {transaccion.id}: {transaccion.concepto}? Esta acción eliminará también las auditorías relacionadas."):
+                transaccion.eliminar()
+                output.insert(tk.END, f"Transacción eliminada: ID {transaccion.id} - {transaccion.concepto}\n", "danger")
+                output.insert(tk.END, "Auditorías asociadas eliminadas por cascada.\n", "warning")
+                cargar_transacciones()
+                messagebox.showinfo("Éxito", f"Transacción {transaccion.id} eliminada correctamente.")
+        except ValueError:
+            messagebox.showerror("Error", "ID de transacción inválido")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al eliminar: {e}")
+            output.insert(tk.END, f"Error al eliminar transacción: {e}\n", "danger")
 
 def detectar_errores_ia():
     if not cliente_seleccionado:
@@ -288,7 +312,7 @@ def cargar_transacciones():
     saldo = 0
     for t in transacciones:
         tag = "saldo" if t.tipo == "ingreso" else "negative"
-        output.insert(tk.END, f"{t.fecha} | {t.concepto} | ${t.monto:.2f} ({t.tipo})\n", tag)
+        output.insert(tk.END, f"{t.fecha} | {t.concepto} | ${t.monto:.2f} ({t.tipo}) | ID: {t.id}\n", tag)
         if t.tipo == "ingreso":
             saldo += t.monto
         else:
