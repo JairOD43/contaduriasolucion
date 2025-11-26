@@ -58,7 +58,7 @@ def login_window():
     entry_pwd = ttk.Entry(frame, font=("Segoe UI", 12), width=35, show='•')
     entry_pwd.pack(pady=12)
 
-    combo_rol = ttk.Combobox(frame, values=["cliente", "contador_principal", "admin"], state="readonly")
+    combo_rol = ttk.Combobox(frame, values=["cliente", "contador_principal"], state="readonly")
     combo_rol.set("cliente")
     combo_rol.pack(pady=18)
 
@@ -147,9 +147,9 @@ def actualizar_cliente():
     if not cliente_seleccionado:
         messagebox.showerror("Error", "Selecciona un cliente primero")
         return
-    nuevo_nombre = simpledialog.askstring("Actualizar Cliente", f"Nuevo nombre para {cliente_seleccionado.nombre} (dejar vacío para no cambiar):", initialvalue=cliente_seleccionado.nombre)
-    nuevo_rfc = simpledialog.askstring("Actualizar Cliente", f"Nuevo RFC para {cliente_seleccionado.nombre} (dejar vacío para no cambiar):", initialvalue=cliente_seleccionado.rfc)
-    nuevo_regimen = simpledialog.askstring("Actualizar Cliente", f"Nuevo régimen fiscal para {cliente_seleccionado.nombre} (dejar vacío para no cambiar):", initialvalue=cliente_seleccionado.regimen_fiscal)
+    nuevo_nombre = simpledialog.askstring("Actualizar Cliente", f"Nuevo nombre para {cliente_seleccionado.nombre} :", initialvalue=cliente_seleccionado.nombre)
+    nuevo_rfc = simpledialog.askstring("Actualizar Cliente", f"Nuevo RFC para {cliente_seleccionado.nombre} :", initialvalue=cliente_seleccionado.rfc)
+    nuevo_regimen = simpledialog.askstring("Actualizar Cliente", f"Nuevo régimen fiscal para {cliente_seleccionado.nombre} :", initialvalue=cliente_seleccionado.regimen_fiscal)
     try:
         cliente_seleccionado.actualizar(nuevo_nombre if nuevo_nombre.strip() else None, nuevo_rfc if nuevo_rfc.strip() else None, nuevo_regimen if nuevo_regimen.strip() else None)
         lbl_cliente.config(text=f"Cliente: {cliente_seleccionado.nombre} | RFC: {cliente_seleccionado.rfc}")
@@ -223,6 +223,7 @@ def eliminar_transaccion():
             output.insert(tk.END, f"Error al eliminar transacción: {e}\n", "danger")
 
 def detectar_errores_ia():
+    global cliente_seleccionado
     if not cliente_seleccionado:
         messagebox.showerror("Error", "Selecciona un cliente primero")
         return
@@ -232,29 +233,49 @@ def detectar_errores_ia():
         return
     trans_list = []
     for t in transacciones:
-        trans_list.append(type('obj', (object,), {'tipo': t.tipo, 'monto': t.monto, 'concepto': t.concepto})())
+        obj = type('TransObj', (object,), {'tipo': t.tipo, 'monto': t.monto, 'concepto': t.concepto})()
+        trans_list.append(obj)
     errores = detectar_errores(trans_list)
-    output.insert(tk.END, "AUDITORÍA IA\n", "title")
-    for error in errores:
-        tag = "critical" if "ALTA" in error or "IA -" in error else "warning"
-        output.insert(tk.END, f"{error}\n\n", tag)
+    output.insert(tk.END, f"AUDITORÍA IA EJECUTADA EL {date.today()} PARA {cliente_seleccionado.nombre}\n", "title")
     if errores and errores[0] != "Ningún error crítico detectado por IA.":
-        Auditoria.crear(transacciones[0].id, current_user.id, date.today(), "Auditoría IA ejecutada", "pendiente")
+        num_errores = len(errores)
+        output.insert(tk.END, f"Se detectaron {num_errores} error potencial:\n\n", "critical")
+        for i, error in enumerate(errores, 1):
+            tag = "critical" if "ALTA" in error or "IA -" in error else "warning"
+            output.insert(tk.END, f"{i}. {error}\n", tag)
+            
+            if current_user:
+                Auditoria.crear(transacciones[0].id, current_user.id, date.today(), error, 'pendiente')
+        output.insert(tk.END, f"\n{num_errores} auditoría creada en la base de datos.\n", "success")
+    else:
+        output.insert(tk.END, "Ningún error crítico detectado. Auditoría registrada como 'limpia'.\n", "success")
+        if current_user:
+            Auditoria.crear(transacciones[0].id, current_user.id, date.today(), "Auditoría IA: Sin anomalías detectadas", 'aprobada')
+    output.insert(tk.END, f"\nAuditoría completada. Revisa 'Ver Auditorías' para detalles.\n", "line")
+    messagebox.showinfo("Auditoría IA Completada", f"Procesadas {len(transacciones)} transacciones. {len(errores) if errores else 0} alertas generadas.")
 
 def ver_auditorias():
     if not cliente_seleccionado:
         messagebox.showerror("Error", "Selecciona un cliente primero")
         return
     transacciones = Transaccion.listar_por_cliente(cliente_seleccionado.id)
-    output.insert(tk.END, "AUDITORÍAS\n", "title")
+    output.insert(tk.END, f"AUDITORÍAS PARA {cliente_seleccionado.nombre}\n", "title")
+    total_auds = 0
     for t in transacciones:
         auds = Auditoria.listar_por_transaccion(t.id)
-        output.insert(tk.END, f"Transacción {t.id}: {len(auds)} auditorías\n", "line")
-        for a in auds:
-            output.insert(tk.END, f"  - {a.descripcion} ({a.resultado})\n", "line")
+        if auds:
+            output.insert(tk.END, f"\n--- Transacción ID {t.id}: {t.concepto} (${t.monto} - {t.tipo}) ---\n", "line")
+            for a in auds:
+                tag = "success" if a.resultado == "aprobada" else "warning" if a.resultado == "pendiente" else "danger"
+                output.insert(tk.END, f"  {a.descripcion} | Resultado: {a.resultado} | Fecha: {a.fecha_auditoria}\n", tag)
+                total_auds += 1
+    if total_auds == 0:
+        output.insert(tk.END, "No hay auditorías registradas para este cliente.\n", "warning")
+    else:
+        output.insert(tk.END, f"\nTotal de auditorías: {total_auds}\n", "line")
 
 def eliminar_auditoria():
-    output.insert(tk.END, "Eliminar auditoría (pendiente de implementación)\n", "warning")
+    output.insert(tk.END, "Eliminar auditoría \n", "warning")
 
 def ver_todos_clientes():
     clientes = Cliente.listar_todos()
