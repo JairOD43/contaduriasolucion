@@ -1,4 +1,3 @@
-# cliente.py ← VERSIÓN CORREGIDA (ya funciona al 100%)
 from db_connection import get_conn
 
 class Cliente:
@@ -11,17 +10,16 @@ class Cliente:
     @classmethod
     def crear(cls, nombre, rfc, regimen_fiscal):
         conn = get_conn()
-        cur = None  # ← Añadido para mejor manejo
+        cur = None
         try:
             cur = conn.cursor()
             cur.execute("INSERT INTO clientes (nombre, rfc, regimen_fiscal) VALUES (%s, %s, %s)", (nombre, rfc, regimen_fiscal))
             conn.commit()
             return cls(cur.lastrowid, nombre, rfc, regimen_fiscal)
         finally:
-            if cur:  # ← Manejo seguro del cursor
+            if cur:
                 cur.close()
-            # ¡CORREGIDO! Usar close() para devolver al pool
-            conn.close()  # ← CAMBIADO DE return_to_pool() A close()
+            conn.close()
 
     @classmethod
     def listar_todos(cls):
@@ -34,7 +32,7 @@ class Cliente:
         finally:
             if cur:
                 cur.close()
-            conn.close()  # ← Ya estaba bien
+            conn.close()
 
     @classmethod
     def buscar_por_nombre(cls, nombre):
@@ -48,7 +46,36 @@ class Cliente:
         finally:
             if cur:
                 cur.close()
-            conn.close()  # ← Ya estaba bien
+            conn.close()
+
+    def actualizar(self, nuevo_nombre=None, nuevo_rfc=None, nuevo_regimen=None):
+        conn = get_conn()
+        cur = None
+        try:
+            cur = conn.cursor()
+            updates = []
+            params = []
+            if nuevo_nombre is not None:
+                updates.append("nombre = %s")
+                params.append(nuevo_nombre)
+                self.nombre = nuevo_nombre
+            if nuevo_rfc is not None:
+                updates.append("rfc = %s")
+                params.append(nuevo_rfc)
+                self.rfc = nuevo_rfc
+            if nuevo_regimen is not None:
+                updates.append("regimen_fiscal = %s")
+                params.append(nuevo_regimen)
+                self.regimen_fiscal = nuevo_regimen
+            if updates:
+                params.append(self.id)
+                query = f"UPDATE clientes SET {', '.join(updates)} WHERE id = %s"
+                cur.execute(query, params)
+                conn.commit()
+        finally:
+            if cur:
+                cur.close()
+            conn.close()
 
     def __str__(self):
         return f"{self.nombre} | RFC: {self.rfc}"

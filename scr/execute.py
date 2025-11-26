@@ -147,9 +147,17 @@ def actualizar_cliente():
     if not cliente_seleccionado:
         messagebox.showerror("Error", "Selecciona un cliente primero")
         return
-    nuevo_nombre = simpledialog.askstring("Actualizar", f"Nuevo nombre para {cliente_seleccionado.nombre}:")
-    if nuevo_nombre:
-        output.insert(tk.END, f"Actualizando cliente: {nuevo_nombre}\n", "warning")
+    nuevo_nombre = simpledialog.askstring("Actualizar Cliente", f"Nuevo nombre para {cliente_seleccionado.nombre} (dejar vacío para no cambiar):", initialvalue=cliente_seleccionado.nombre)
+    nuevo_rfc = simpledialog.askstring("Actualizar Cliente", f"Nuevo RFC para {cliente_seleccionado.nombre} (dejar vacío para no cambiar):", initialvalue=cliente_seleccionado.rfc)
+    nuevo_regimen = simpledialog.askstring("Actualizar Cliente", f"Nuevo régimen fiscal para {cliente_seleccionado.nombre} (dejar vacío para no cambiar):", initialvalue=cliente_seleccionado.regimen_fiscal)
+    try:
+        cliente_seleccionado.actualizar(nuevo_nombre if nuevo_nombre.strip() else None, nuevo_rfc if nuevo_rfc.strip() else None, nuevo_regimen if nuevo_regimen.strip() else None)
+        lbl_cliente.config(text=f"Cliente: {cliente_seleccionado.nombre} | RFC: {cliente_seleccionado.rfc}")
+        output.insert(tk.END, f"Cliente actualizado: {cliente_seleccionado.nombre} | RFC: {cliente_seleccionado.rfc}\n", "success")
+        messagebox.showinfo("Éxito", "Cliente actualizado correctamente.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Error al actualizar: {e}")
+        output.insert(tk.END, f"Error al actualizar cliente: {e}\n", "danger")
 
 def eliminar_cliente():
     if not cliente_seleccionado:
