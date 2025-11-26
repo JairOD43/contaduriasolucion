@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from tkinter import font as tkfont
-from datetime import datetime, date  # ← CORREGIDO: Añadido 'date'
+from datetime import datetime, date
 from usuario import Usuario
 from cliente import Cliente
 from transaccion import Transaccion
@@ -129,10 +129,9 @@ def seleccionar_cliente():
             messagebox.showerror("Error", "Cliente no encontrado")
 
 def formulario_nuevo_cliente():
-    if current_user.role != "admin":
-        messagebox.showerror("Acceso Denegado", "Solo admins pueden crear clientes")
+    if current_user.role not in ["admin", "contador_principal"]:
+        messagebox.showerror("Acceso Denegado", "Solo admins y contadores principales pueden crear clientes")
         return
-    # Aquí va el formulario para nuevo cliente (ejemplo básico; expándelo si necesitas)
     nombre = simpledialog.askstring("Nuevo Cliente", "Nombre del cliente:")
     if nombre:
         rfc = simpledialog.askstring("Nuevo Cliente", "RFC:")
@@ -148,10 +147,8 @@ def actualizar_cliente():
     if not cliente_seleccionado:
         messagebox.showerror("Error", "Selecciona un cliente primero")
         return
-    # Ejemplo básico; expándelo
     nuevo_nombre = simpledialog.askstring("Actualizar", f"Nuevo nombre para {cliente_seleccionado.nombre}:")
     if nuevo_nombre:
-        # Aquí actualizar en DB (implementa según necesites)
         output.insert(tk.END, f"Actualizando cliente: {nuevo_nombre}\n", "warning")
 
 def eliminar_cliente():
@@ -159,7 +156,6 @@ def eliminar_cliente():
         messagebox.showerror("Error", "Selecciona un cliente primero")
         return
     if messagebox.askyesno("Confirmar", f"Eliminar {cliente_seleccionado.nombre}?"):
-        # Implementa eliminación
         output.insert(tk.END, f"Cliente eliminado: {cliente_seleccionado.nombre}\n", "danger")
 
 def registrar_transaccion():
@@ -179,12 +175,7 @@ def registrar_transaccion():
         except ValueError:
             messagebox.showerror("Error", "Monto inválido")
 
-def actualizar_transaccion():
-    # Implementa según necesites
-    output.insert(tk.END, "Actualizar transacción (pendiente de implementación)\n", "warning")
-
 def eliminar_transaccion():
-    # Implementa según necesites
     output.insert(tk.END, "Eliminar transacción (pendiente de implementación)\n", "warning")
 
 def detectar_errores_ia():
@@ -195,7 +186,6 @@ def detectar_errores_ia():
     if not transacciones:
         output.insert(tk.END, "No hay transacciones para auditar.\n", "warning")
         return
-    # Simula objetos para detectar_errores (ajusta según estructura)
     trans_list = []
     for t in transacciones:
         trans_list.append(type('obj', (object,), {'tipo': t.tipo, 'monto': t.monto, 'concepto': t.concepto})())
@@ -204,7 +194,6 @@ def detectar_errores_ia():
     for error in errores:
         tag = "critical" if "ALTA" in error or "IA -" in error else "warning"
         output.insert(tk.END, f"{error}\n\n", tag)
-    # Crear auditoría ejemplo
     if errores and errores[0] != "Ningún error crítico detectado por IA.":
         Auditoria.crear(transacciones[0].id, current_user.id, date.today(), "Auditoría IA ejecutada", "pendiente")
 
@@ -221,18 +210,45 @@ def ver_auditorias():
             output.insert(tk.END, f"  - {a.descripcion} ({a.resultado})\n", "line")
 
 def eliminar_auditoria():
-    # Implementa según necesites
     output.insert(tk.END, "Eliminar auditoría (pendiente de implementación)\n", "warning")
 
 def ver_todos_clientes():
     clientes = Cliente.listar_todos()
-    output.insert(tk.END, "TODOS LOS CLIENTES\n", "title")
+    if not clientes:
+        messagebox.showinfo("Info", "No hay clientes registrados.")
+        return
+    ventana = tk.Toplevel(root)
+    ventana.title("Todos los Clientes")
+    ventana.geometry("600x500")
+    ventana.configure(bg="#0f1422")
+    ventana.resizable(True, True)
+    ventana.transient(root)
+
+    frame = tk.Frame(ventana, bg="#141a28")
+    frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+    tk.Label(frame, text="Lista de Clientes", font=("Segoe UI", 16, "bold"), fg=accent, bg="#141a28").pack(pady=(0,10))
+
+    columns = ("ID", "Nombre", "RFC", "Régimen Fiscal")
+    tree = ttk.Treeview(frame, columns=columns, show="headings", height=20)
+    for col in columns:
+        tree.heading(col, text=col)
+        tree.column(col, width=150, anchor=tk.W)
+
     for c in clientes:
-        output.insert(tk.END, f"{c}\n", "line")
+        tree.insert("", tk.END, values=(c.id, c.nombre, c.rfc, c.regimen_fiscal))
+
+    tree.pack(fill=tk.BOTH, expand=True, pady=(0,10))
+
+    scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    ttk.Button(frame, text="Cerrar", command=ventana.destroy).pack(pady=10)
 
 def ver_todos_usuarios():
-    if current_user.role != "admin":
-        messagebox.showerror("Acceso Denegado", "Solo admins pueden ver usuarios")
+    if current_user.role not in ["admin", "contador_principal"]:
+        messagebox.showerror("Acceso Denegado", "Solo admins y contadores principales pueden ver usuarios")
         return
     usuarios = Usuario.listar_todos()
     if not usuarios:
@@ -260,7 +276,7 @@ def cargar_transacciones():
     output.insert(tk.END, f"\nSaldo total: ${saldo:.2f}\n", "saldo" if saldo >= 0 else "negative")
 
 def cerrar_sesion():
-    global current_user, cliente_seleccionado  # ← CORREGIDO: Movido al inicio de la función
+    global current_user, cliente_seleccionado
     if messagebox.askyesno("Cerrar sesión", "¿Cerrar sesión actual?"):
         current_user = None
         cliente_seleccionado = None
@@ -282,15 +298,14 @@ botones_config = [
     ("Seleccionar Cliente", seleccionar_cliente, ["cliente", "contador_principal", "admin"]),
     ("Registrar Nuevo Cliente", formulario_nuevo_cliente, ["contador_principal", "admin"]),
     ("Actualizar Cliente", actualizar_cliente, ["contador_principal", "admin"]),
-    ("Eliminar Cliente", eliminar_cliente, ["admin"]),
+    ("Eliminar Cliente", eliminar_cliente, ["contador_principal", "admin"]),
     ("Nueva Transacción", registrar_transaccion, ["contador_principal", "admin"]),
-    ("Actualizar Transacción", actualizar_transaccion, ["contador_principal", "admin"]),
-    ("Eliminar Transacción", eliminar_transaccion, ["admin"]),
+    ("Ver Todos los Clientes", ver_todos_clientes, ["contador_principal", "admin"]),
+    ("Eliminar Transacción", eliminar_transaccion, ["contador_principal", "admin"]),
     ("Auditoría con IA (CU-12)", detectar_errores_ia, ["contador_principal", "admin"]),
     ("Ver Auditorías", ver_auditorias, ["contador_principal", "admin"]),
-    ("Eliminar Auditoría", eliminar_auditoria, ["admin"]),
-    ("Ver Todos los Clientes", ver_todos_clientes, ["contador_principal", "admin"]),
-    ("Ver Todos los Usuarios", ver_todos_usuarios, ["admin"]),
+    ("Eliminar Auditoría", eliminar_auditoria, ["contador_principal", "admin"]),
+    ("Ver Todos los Usuarios", ver_todos_usuarios, ["contador_principal", "admin"]),
     ("Cerrar Sesión", cerrar_sesion, ["cliente", "contador_principal", "admin"]),
 ]
 
